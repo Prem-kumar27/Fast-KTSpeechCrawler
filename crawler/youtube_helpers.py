@@ -6,7 +6,7 @@ from webvtt import WebVTT
 import copy
 import tempfile
 import shutil
-from crawler.utils import extract_audio_part_segment, get_ts_seconds
+from utils import extract_audio_part_segment, get_ts_seconds
 from path import Path
 import datetime
 # from datetime import datetime
@@ -18,7 +18,8 @@ import speech_recognition as sr
 from Levenshtein import *
 from tqdm import tqdm
 
-everything_cool = re.compile(r"^[A-Za-z0-9\,\.\-\?\"\'\’\!\“\s\;\:\“\”\–\‘\’\’\/\\]+$", re.IGNORECASE)
+everything_cool = re.compile(
+    r"^[A-Za-z0-9\,\.\-\?\"\'\’\!\“\s\;\:\“\”\–\‘\’\’\/\\]+$", re.IGNORECASE)
 leave_chars = re.compile(r"[^a-z\s\']", re.IGNORECASE)
 # numbers are ignored
 html_tags = re.compile(r'<.*?>')
@@ -62,8 +63,10 @@ def get_hash(content):
 
 
 def timedelta_dt(t1, t2):
-    dt1 = datetime.timedelta(hours=t1.hour, minutes=t1.minute, seconds=t1.second, microseconds=t1.microsecond)
-    dt2 = datetime.timedelta(hours=t2.hour, minutes=t2.minute, seconds=t2.second, microseconds=t2.microsecond)
+    dt1 = datetime.timedelta(hours=t1.hour, minutes=t1.minute,
+                             seconds=t1.second, microseconds=t1.microsecond)
+    dt2 = datetime.timedelta(hours=t2.hour, minutes=t2.minute,
+                             seconds=t2.second, microseconds=t2.microsecond)
     return dt2 - dt1
 
 
@@ -83,7 +86,7 @@ def load_all_subtitles(subtitle_file):
              "original_phrase": phrase,
              "sub_file": subtitle_file,
              "duration": delta.total_seconds(),
-             "idx" : s_idx}
+             "idx": s_idx}
         )
     return res
 
@@ -100,7 +103,8 @@ def get_video_file(subtitle_file):
             shutil.move(dumb_youtube_file, naive_video_file)
             return naive_video_file
         else:
-            raise Exception("Video file does not exists {}".format(dumb_youtube_file))
+            raise Exception(
+                "Video file does not exists {}".format(dumb_youtube_file))
 
 
 def merge_subtitles(subs, min_dist=1.5, max_dist=6.0):
@@ -119,7 +123,8 @@ def merge_subtitles(subs, min_dist=1.5, max_dist=6.0):
                 # merge
                 new_s = copy.deepcopy(prev_s)
                 new_s["ts_end"] = s["ts_end"]
-                new_s["original_phrase"] = prev_s["original_phrase"] + " " + s["original_phrase"]
+                new_s["original_phrase"] = prev_s["original_phrase"] + \
+                    " " + s["original_phrase"]
                 new_delta = timedelta_dt(new_s["ts_start"], new_s["ts_end"])
                 new_s["duration"] = new_delta.total_seconds()
                 res[-1] = new_s
@@ -158,7 +163,8 @@ def filter_too_close_subtitles(subtitles, min_threshold=1.5):
     for i, s in enumerate(subtitles):
         if i > 0:
             prev_s = subtitles[i - 1]
-            distance = get_ts_seconds(s["ts_start"]) - get_ts_seconds(prev_s["ts_end"])
+            distance = get_ts_seconds(
+                s["ts_start"]) - get_ts_seconds(prev_s["ts_end"])
             if distance > min_threshold:
                 res.append(s)
         else:
@@ -210,7 +216,8 @@ def normalize_numbers(input_str):
 def normalize_subtitle(input_str):
     input_str = ' ' + input_str + ' '
     input_str = input_str.replace(',', ' ').replace('.', ' ')
-    input_str = re.sub(r"([a-z])\-([a-z])", r"\1\2", input_str, 0, re.IGNORECASE)
+    input_str = re.sub(r"([a-z])\-([a-z])", r"\1\2",
+                       input_str, 0, re.IGNORECASE)
     input_str = input_str.replace("- ", " ")
     input_str = input_str.replace("— ", " ")
     input_str = input_str.replace('’', '\'').replace('‘', '\'').replace('ʻ', '\'').replace('´', '\'').replace("&nbsp;",
@@ -247,21 +254,24 @@ def parse_subtitle(subtitle_file, max_duration=15, min_duration=3, min_threshold
     all_subtitles = remove_overlapping_subtitles(all_subtitles)
     print("{} without overlap subtitles".format(len(all_subtitles)))
     # filter bad
-    all_subtitles = [s for s in all_subtitles if not if_contain_bad_symbols(s["original_phrase"])]
+    all_subtitles = [
+        s for s in all_subtitles if not if_contain_bad_symbols(s["original_phrase"])]
     for s in all_subtitles:
         s["phrase"] = normalize_subtitle(s["original_phrase"])
-    not_cool = [s for s in all_subtitles if not re.match(everything_cool, s["phrase"])]
+    not_cool = [s for s in all_subtitles if not re.match(
+        everything_cool, s["phrase"])]
     all_subtitles = [s for s in all_subtitles if re.match(everything_cool, s["phrase"])
                      and len(s["phrase"].strip()) >= min_transcript_len]
     for s in all_subtitles:
         s["phrase"] = leave_alphanum_characters(s["phrase"])
     print("{} after filtering".format(len(all_subtitles)))
 
-    all_subtitles = merge_subtitles(all_subtitles, min_dist=1.0, max_dist=max_duration)
+    all_subtitles = merge_subtitles(
+        all_subtitles, min_dist=1.0, max_dist=max_duration)
     print("{} merged".format(len(all_subtitles)))
     # all_subtitles = filter_too_close_subtitles(all_subtitles, min_threshold=min_threshold)
     all_subtitles = list(filter(lambda x: x["duration"] <= max_duration
-                                          and x["duration"] >= min_duration, all_subtitles))
+                                and x["duration"] >= min_duration, all_subtitles))
 
     # not_cool = list(filter(lambda x: not re.match(everything_cool, x["original_phrase"]), all_subtitles))
     print("not cool", "\n".join([p["original_phrase"] for p in not_cool[:5]]))
@@ -304,7 +314,8 @@ def _get_transcript_google_web_asr(t):
     import tempfile
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            extract_audio_part_segment(t["video_file"], t["ts_start"], t["ts_end"], f.name)
+            extract_audio_part_segment(
+                t["video_file"], t["ts_start"], t["ts_end"], f.name)
 
             r = sr.Recognizer()
             with sr.AudioFile(f.name) as source:
@@ -329,5 +340,6 @@ def google_speech_test(timings, threshold=0.65, samples=2, min_duration=2.5):
         print("empty transcripts!")
         return False
     print([(t["phrase"].lower(), s.lower()) for (t, s) in transcripts])
-    overlap_ratio = [ratio(t["phrase"].lower(), s.lower()) for (t, s) in transcripts]
+    overlap_ratio = [ratio(t["phrase"].lower(), s.lower())
+                     for (t, s) in transcripts]
     return np.mean(overlap_ratio) > threshold
