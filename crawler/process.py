@@ -11,7 +11,8 @@ from utils import extract_audio_part_segment
 from filters import Pipeline, OverlappingSubtitlesRemover, SubtitleCaptionTextFilter, SubtitleMerger,\
     CaptionLengthFilter, CaptionRegexMatcher, CaptionDurationFilter, CaptionLeaveOnlyAlphaNumCharacters, CaptionNormalizer
 from youtube_helpers import load_all_subtitles
-
+import multiprocessing
+from joblib import Parallel, delayed
 
 class RESULT:
     GOOGLE_TEST_NOT_PASSED = 0
@@ -32,9 +33,46 @@ pipeline = Pipeline([
 ])
 
 
+def split_and_save_files(t, target_dir):
+    hash = get_hash(
+        subtitle_file + t["original_phrase"] + str(t["ts_start"]))
+    wav_file_dir = os.path.join(target_dir, "wav", hash[:2])
+    txt_file_dir = os.path.join(target_dir, "txt", hash[:2])
+    metadata_dir = os.path.join(target_dir, "metadata", hash[:2])
+    os.makedirs(wav_file_dir, exist_ok=True)
+    os.makedirs(txt_file_dir, exist_ok=True)
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    target_wav_file = os.path.join(wav_file_dir, hash + ".wav")
+    target_txt_file = os.path.join(txt_file_dir, hash + ".txt")
+    target_metadata_file = os.path.join(
+        metadata_dir, hash + ".json")
+
+    text = t["original_phrase"]
+    if len(text) == 0:
+        return
+    if not os.path.exists(target_wav_file) or not os.path.exists(target_txt_file):
+        extract_audio_part_segment(
+            video_file, t["ts_start"], t["ts_end"], target_wav_file)
+
+        with io.open(target_txt_file, "w", encoding='utf-8') as f:
+            f.write(text)
+
+        with io.open(target_metadata_file, "w", encoding='utf-8') as f:
+            t["ts_start"] = str(t["ts_start"])
+            t["ts_end"] = str(t["ts_end"])
+            t["metadata"] = metadata
+            json.dump(t, f)
+        assert os.path.exists(target_txt_file) and os.path.exists(target_wav_file) \
+            and getsize(target_wav_file) > 4 * 1024, "{} not created".format(target_wav_file)
+            
 if __name__ == "__main__":
-    video_file = sys.argv[1]
-    target_dir = sys.argv[2]
+    # video_file = sys.argv[1]
+    # target_dir = sys.argv[2]
+    n_cores = multiprocessing.cpu_count()
+    video_file = "../T3PsRW6wZSYIntroduction.m4a"
+    target_dir = "../"
+    
     print("video_file", video_file)
     print("target_dir", target_dir)
     ext = "m4a"
@@ -71,39 +109,10 @@ if __name__ == "__main__":
 
         termcolor.cprint("Writing {} samples".format(
             len(filtered_subtitles)), color="cyan")
-        for t in tqdm(filtered_subtitles):
-            hash = get_hash(
-                subtitle_file + t["original_phrase"] + str(t["ts_start"]))
-            wav_file_dir = os.path.join(target_dir, "wav", hash[:2])
-            txt_file_dir = os.path.join(target_dir, "txt", hash[:2])
-            metadata_dir = os.path.join(target_dir, "metadata", hash[:2])
-
-            os.makedirs(wav_file_dir, exist_ok=True)
-            os.makedirs(txt_file_dir, exist_ok=True)
-            os.makedirs(metadata_dir, exist_ok=True)
-
-            target_wav_file = os.path.join(wav_file_dir, hash + ".wav")
-            target_txt_file = os.path.join(txt_file_dir, hash + ".txt")
-            target_metadata_file = os.path.join(metadata_dir, hash + ".json")
-
-            text = t["original_phrase"]
-            if len(text) == 0:
-                continue
-            if not os.path.exists(target_wav_file) or not os.path.exists(target_txt_file):
-                extract_audio_part_segment(
-                    video_file, t["ts_start"], t["ts_end"], target_wav_file)
-
-                with io.open(target_txt_file, "w", encoding='utf-8') as f:
-                    f.write(text)
-
-                with io.open(target_metadata_file, "w", encoding='utf-8') as f:
-                    t["ts_start"] = str(t["ts_start"])
-                    t["ts_end"] = str(t["ts_end"])
-                    t["metadata"] = metadata
-                    json.dump(t, f)
-
-                assert os.path.exists(target_txt_file) and os.path.exists(target_wav_file) \
-                    and getsize(target_wav_file) > 4 * 1024, "{} not created".format(target_wav_file)
+        
+        Parallel(n_jobs=8, backend="multiprocessing")(delayed(split_and_save_files)(t, target_dir)
+                           for t in tqdm(filtered_subtitles))   
+                
     except Exception as e:
         termcolor.cprint(e, color="red")
     finally:
@@ -111,9 +120,9 @@ if __name__ == "__main__":
         log_file.write(json.dumps(overall_info) + "\n")
         log_file.flush()
         log_file.close()
-        if os.path.exists(video_file):
-            os.remove(video_file)
-        if os.path.exists(subtitle_file):
-            os.remove(subtitle_file)
-        if os.path.exists(info_file):
-            os.remove(info_file)
+        # if os.path.exists(video_file):
+        #     os.remove(video_file)
+        # if os.path.exists(subtitle_file):
+        #     os.remove(subtitle_file)
+        # if os.path.exists(info_file):
+        #     os.remove(info_file)
