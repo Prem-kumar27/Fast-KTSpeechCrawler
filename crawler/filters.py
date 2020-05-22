@@ -176,7 +176,7 @@ class GoogleRandomSubsetWERFilter(BaseFilter):
 if __name__ == "__main__":
     from youtube_helpers import load_all_subtitles
     subtitles = load_all_subtitles(
-        "./../video/2oNoBDMGGioHow_to_Make_a_Picnic_Table_-_Plans_and_Instructions.en.vtt")
+        "../EWmCkVfPnJ8Different_Types_of_Learning.en.vtt")
     print(len(subtitles))
     input = {
         'subtitles': subtitles,

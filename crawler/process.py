@@ -33,7 +33,7 @@ pipeline = Pipeline([
 ])
 
 
-def split_and_save_files(t, target_dir):
+def split_and_save_files(t, target_dir, subtitle_file):
     hash = get_hash(
         subtitle_file + t["original_phrase"] + str(t["ts_start"]))
     wav_file_dir = os.path.join(target_dir, "wav", hash[:2])
@@ -53,7 +53,7 @@ def split_and_save_files(t, target_dir):
         return
     if not os.path.exists(target_wav_file) or not os.path.exists(target_txt_file):
         extract_audio_part_segment(
-            video_file, t["ts_start"], t["ts_end"], target_wav_file)
+            audio_file, t["ts_start"], t["ts_end"], target_wav_file)
 
         with io.open(target_txt_file, "w", encoding='utf-8') as f:
             f.write(text)
@@ -67,51 +67,45 @@ def split_and_save_files(t, target_dir):
             and getsize(target_wav_file) > 4 * 1024, "{} not created".format(target_wav_file)
             
 if __name__ == "__main__":
-    # video_file = sys.argv[1]
-    # target_dir = sys.argv[2]
+    audio_file = sys.argv[1]
+    target_dir = sys.argv[2]
     n_cores = multiprocessing.cpu_count()
-    video_file = "../T3PsRW6wZSYIntroduction.m4a"
-    target_dir = "../"
-    
-    print("video_file", video_file)
-    print("target_dir", target_dir)
     ext = "m4a"
 
-    subtitle_file = video_file.replace(f'.{ext}', '.en.vtt')
-    info_file = video_file.replace(f'.{ext}', '.info.json')
+    subtitle_file = audio_file.replace(f'.{ext}', '.en.vtt')
+    info_file = audio_file.replace(f'.{ext}', '.info.json')
     overall_info = {"sub_file": subtitle_file, "info": info_file}
     log_file = open("./log.json", "a+")
 
     result = RESULT.OK
     try:
         if not os.path.exists(subtitle_file) or not os.path.exists(info_file):
-            termcolor.cprint("Subtitle file or Info files do not exist. {}".format(
-                video_file), color="red")
+            termcolor.cprint("Subtitle file or Info files do not exist. {}".format(audio_file), color="red")
             raise Exception("Subtitle file or Info files do not exist.")
 
         # Download google subtitle to cross check with closed captions
         with open(info_file) as f:
             metadata = json.load(f)
-        #youtube_link = metadata['webpage_url']
-        print("Parsing subtitle")
-        subtitles = load_all_subtitles(subtitle_file)
-        print(len(subtitles))
-        input = {
-            'subtitles': subtitles,
-            'video_file': video_file
-        }
-        overall_info["num_subtitles"] = len(subtitles)
-        termcolor.cprint("Got {} candidates".format(
-            len(subtitles)), color="yellow")
+            #youtube_link = metadata['webpage_url']
+            print("Parsing subtitle")
+            subtitles = load_all_subtitles(subtitle_file)
+            print(len(subtitles))
+            input = {
+                'subtitles': subtitles,
+                'audio_file': audio_file
+            }
+            overall_info["num_subtitles"] = len(subtitles)
+            termcolor.cprint("Got {} candidates".format(
+                len(subtitles)), color="yellow")
 
-        filtered_input = pipeline(input)
-        filtered_subtitles = filtered_input["subtitles"]
+            filtered_input = pipeline(input)
+            filtered_subtitles = filtered_input["subtitles"]
 
-        termcolor.cprint("Writing {} samples".format(
-            len(filtered_subtitles)), color="cyan")
+            termcolor.cprint("Writing {} samples".format(
+                len(filtered_subtitles)), color="cyan")
         
-        Parallel(n_jobs=8, backend="multiprocessing")(delayed(split_and_save_files)(t, target_dir)
-                           for t in tqdm(filtered_subtitles))   
+            Parallel(n_jobs=n_cores, backend="multiprocessing")(delayed(split_and_save_files)(t, target_dir, subtitle_file)
+                            for t in tqdm(filtered_subtitles))   
                 
     except Exception as e:
         termcolor.cprint(e, color="red")
@@ -120,8 +114,8 @@ if __name__ == "__main__":
         log_file.write(json.dumps(overall_info) + "\n")
         log_file.flush()
         log_file.close()
-        # if os.path.exists(video_file):
-        #     os.remove(video_file)
+        # if os.path.exists(audio_file):
+        #     os.remove(audio_file)
         # if os.path.exists(subtitle_file):
         #     os.remove(subtitle_file)
         # if os.path.exists(info_file):

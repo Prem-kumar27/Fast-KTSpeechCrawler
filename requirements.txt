@@ -5,3 +5,6 @@ flask
 youtube-dl
 python-Levenshtein
 SpeechRecognition 
+joblib
+tqdm
+numpy
