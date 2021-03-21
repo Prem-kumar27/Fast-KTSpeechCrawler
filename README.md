@@ -15,6 +15,9 @@ pip install -r requirements.txt
 chmod a+x ./crawler/en_corpus.sh
 ./crawler/en_corpus.sh <dir_with_intermediate_results> <dir_for_resulting_samples>
 ```
+## Downloading a Playlist
+./download_playlist.sh <playlist_url>
+
 ## Browsing samples
 ```
 python server.py --corpus <dir_for_resulting_samples>
